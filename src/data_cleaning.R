@@ -1,21 +1,35 @@
+# data_cleaning.R
 # Load necessary libraries
-install.packages("dplyr")
-install.packages("lubridate")
-library(dplyr)
+library(tidyverse)
 library(lubridate)
 
-# Create a date range from September 2015 to June 2024
-date_range <- seq.Date(from = as.Date("2015-09-01"), to = as.Date("2024-06-01"), by = "month")
+# Load the sample dataset
+attrition_data <- read.csv("sample_attrition.csv")
 
-# Create a sample dataset
-sample_attrition <- data.frame(
-  session_year = year(date_range),
-  session_month = month(date_range, label = TRUE, abbr = FALSE),
-  percent_retained = runif(length(date_range), min = 50, max = 100)  # Random values between 50 and 100 for retention
-)
+# Convert session_month to numerical month and create session_date
+attrition_data <- attrition_data %>%
+  mutate(session_month_num = match(session_month, month.name),
+         session_date = make_date(session_year, session_month_num))
 
-# Save the dataset as a CSV file
-write.csv(sample_attrition, "sample_attrition.csv", row.names = FALSE)
+# Filter data between September 2015 and June 2024, excluding August
+attrition_data <- attrition_data %>%
+  filter(session_date >= as.Date("2015-09-01") & session_date <= as.Date("2024-06-30") & session_month != "August")
 
-# Preview the sample data
-head(sample_attrition)
+# Calculate IQR for percent_retained
+Q1 <- quantile(attrition_data$percent_retained, 0.25)
+Q3 <- quantile(attrition_data$percent_retained, 0.75)
+IQR_value <- IQR(attrition_data$percent_retained)
+
+# Define bounds for outliers
+lower_bound <- Q1 - 1.5 * IQR_value
+upper_bound <- Q3 + 1.5 * IQR_value
+
+# Filter out outliers
+attrition_data <- attrition_data %>%
+  filter(percent_retained >= lower_bound & percent_retained <= upper_bound)
+
+# Save the cleaned dataset
+write.csv(attrition_data, "attrition_cleaned.csv", row.names = FALSE)
+
+# Preview the dataset after removing outliers
+head(attrition_data)
